@@ -3,7 +3,6 @@ package dicom
 import (
 	"errors"
 	"fmt"
-	"github.com/suyashkumar/dicom/pkg/pn"
 	"github.com/suyashkumar/dicom/pkg/tag"
 	"reflect"
 )
@@ -37,17 +36,10 @@ func newErrSpecNotSingle(vmRaw string) error {
 }
 
 // Check a list of values to see if it is a single value.
-func checkSingleValue(elementTag tag.Tag, valueCount int, ignoreSpec bool) error {
+func checkSingleValue(elementTag tag.Tag, valueCount int) error {
 	// If our value count is not 1, immediately return an error.
 	if valueCount != 1 {
 		return newErrMultipleValuesFound(valueCount)
-	}
-
-	// If we are ignoring the spec OR this is a private tag, we are good to go. We have
-	// a single value, so we will convert it. If this is a private tag, we have no way
-	// of checking the spec, so we can ignore that the user wants us to check it.
-	if ignoreSpec || tag.IsPrivate(elementTag.Group) {
-		return nil
 	}
 
 	// If we are not ignoring the spec, look up the dicom Tag info and see if it has a
@@ -95,41 +87,16 @@ func (converter ElementValueConverter) MustToStrings() []string {
 // string value, and returns an error on failure.
 //
 // This method will fail if the underlying value is the wrong type, does not contain
-func (converter ElementValueConverter) ToString(ignoreSpec bool) (string, error) {
+func (converter ElementValueConverter) ToString() (string, error) {
 	strings, err := converter.ToStrings()
 	if err != nil {
 		return "", err
 	}
 
-	err = checkSingleValue(converter.element.Tag, len(strings), ignoreSpec)
+	err = checkSingleValue(converter.element.Tag, len(strings))
 	if err != nil {
 		return "", err
 	}
 
 	return strings[0], nil
-}
-
-// ToPersonNames tries to coerce the value from dicom.Element.Value.GetValue() to
-// []pn.PersonName and returns an error on failure.
-func (converter ElementValueConverter) ToPersonNames() ([]pn.PersonName, error) {
-	strings, err := converter.ToStrings()
-	if err != nil {
-		return nil, err
-	}
-
-	personNames := make([]pn.PersonName, len(strings))
-	for i, thisString := range strings {
-		thisPn, err := pn.NewPersonNameFromDicom(thisString)
-		if err != nil {
-			return personNames, fmt.Errorf(
-				"error converting string value %v to PersonName: %w",
-				i,
-				err,
-			)
-		}
-
-		personNames[i] = thisPn
-	}
-
-	return personNames, nil
 }
