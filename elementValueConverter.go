@@ -3,6 +3,7 @@ package dicom
 import (
 	"errors"
 	"fmt"
+	"github.com/suyashkumar/dicom/pkg/personname"
 	"github.com/suyashkumar/dicom/pkg/tag"
 	"reflect"
 )
@@ -36,10 +37,17 @@ func newErrSpecNotSingle(vmRaw string) error {
 }
 
 // Check a list of values to see if it is a single value.
-func checkSingleValue(elementTag tag.Tag, valueCount int) error {
+func checkSingleValue(elementTag tag.Tag, valueCount int, ignoreSpec bool) error {
 	// If our value count is not 1, immediately return an error.
 	if valueCount != 1 {
 		return newErrMultipleValuesFound(valueCount)
+	}
+
+	// If we are ignoring the spec OR this is a private tag, we are good to go. We have
+	// a single value, so we will convert it. If this is a private tag, we have no way
+	// of checking the spec, so we can ignore that the user wants us to check it.
+	if ignoreSpec || tag.IsPrivate(elementTag.Group) {
+		return nil
 	}
 
 	// If we are not ignoring the spec, look up the dicom Tag info and see if it has a
@@ -86,17 +94,81 @@ func (converter ElementValueConverter) MustToStrings() []string {
 // ToStrings tries to coerce the value from dicom.Element.Value.GetValue() to a single
 // string value, and returns an error on failure.
 //
-// This method will fail if the underlying value is the wrong type, does not contain
-func (converter ElementValueConverter) ToString() (string, error) {
+// This method will fail if the underlying value is the wrong type, or does not contain
+// a single value.
+//
+// If ignoreSpec is false, the VR of the element tag will be looked up in the dicom
+// spec, and the operation will fail if it is not '1', regardless of how many values
+// are in this specific instance of the element.
+func (converter ElementValueConverter) ToString(ignoreSpec bool) (string, error) {
 	strings, err := converter.ToStrings()
 	if err != nil {
 		return "", err
 	}
 
-	err = checkSingleValue(converter.element.Tag, len(strings))
+	err = checkSingleValue(converter.element.Tag, len(strings), ignoreSpec)
 	if err != nil {
 		return "", err
 	}
 
 	return strings[0], nil
+}
+
+// MustToString is as ToString, but panics on error.
+func (converter ElementValueConverter) MustToString(ignoreSpec bool) string {
+	stringVal, err := converter.ToString(ignoreSpec)
+	if err != nil {
+		panic(err)
+	}
+	return stringVal
+}
+
+// ToPersonNames tries to coerce the value from dicom.Element.Value.GetValue() to
+// []pn.PersonName and returns an error on failure.
+func (converter ElementValueConverter) ToPersonNames() ([]personname.Info, error) {
+	strings, err := converter.ToStrings()
+	if err != nil {
+		return nil, err
+	}
+
+	personNames := make([]personname.Info, len(strings))
+	for i, thisString := range strings {
+		thisPn, err := personname.Parse(thisString)
+		if err != nil {
+			return personNames, fmt.Errorf(
+				"error converting string value %v to PersonName: %w",
+				i,
+				err,
+			)
+		}
+
+		personNames[i] = thisPn
+	}
+
+	return personNames, nil
+}
+
+// ToPersonName tries to coerce the value from dicom.Element.Value.GetValue() to a
+// single personname.Info value, and returns an error on failure.
+//
+// This method will fail if the underlying value is the wrong type, or does not contain
+// a single value.
+//
+// If ignoreSpec is false, the VR of the element tag will be looked up in the dicom
+// spec, and the operation will fail if it is not '1', regardless of how many values
+// are in this specific instance of the element.
+func (converter ElementValueConverter) ToPersonName(
+	ignoreSpec bool,
+) (personname.Info, error) {
+	names, err := converter.ToPersonNames()
+	if err != nil {
+		return personname.Info{}, err
+	}
+
+	err = checkSingleValue(converter.element.Tag, len(names), ignoreSpec)
+	if err != nil {
+		return personname.Info{}, err
+	}
+
+	return names[0], nil
 }
