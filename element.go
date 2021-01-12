@@ -24,6 +24,11 @@ type Element struct {
 	Value                  Value      `json:"value"`
 }
 
+// DecodeValue returns an ElementValueDecoder, which offers helper methods for extracting
+// the inner value of value of e.Value.
+func (e *Element) DecodeValue() ElementValueDecoder {
+	return ElementValueDecoder{element: e}
+}
 func (e *Element) String() string {
 	var tagName string
 	if tagInfo, err := tag.Find(e.Tag); err == nil {
