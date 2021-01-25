@@ -34,6 +34,7 @@ func newErrConvertValue(expected interface{}, actual interface{}) error {
 // but multiple values are found. Wraps ErrDecodeValue
 var ErrMultipleValuesFound = errors.New("expected single value")
 
+// newErrMultipleValuesFound creates a new ErrMultipleValuesFound with some context.
 func newErrMultipleValuesFound(valueCount int) error {
 	return fmt.Errorf("%w, but found %v", ErrMultipleValuesFound, valueCount)
 }
@@ -86,7 +87,7 @@ type ElementValueDecoder struct {
 	element *Element
 }
 
-// Check a list of values to see if it is a single value.
+// checkSingleValue checks a list of values to see if it is a single value.
 func (converter ElementValueDecoder) checkSingleValue(
 	valueCount int, checkSpec bool,
 ) error {
