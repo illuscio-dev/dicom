@@ -6,6 +6,67 @@ import (
 
 const segmentSep = "^"
 
+// GroupTrailingNullLevel represents how many null '^' separators are present in the
+// GroupInfo.DCM() return value.
+type GroupTrailingNullLevel uint
+
+// String implements fmt.Stringer, giving human-readable names to the trailing null
+// level.
+//
+// Returns "NONE" if no null separators were present.
+//
+// Returns "ALL" if the highest possible null separator was present.
+//
+// Otherwise, returns the name of the section that comes after the highest present null
+// separator.
+//
+// String will panic if called on a value that exceeds GroupNullLevelAll.
+func (level GroupTrailingNullLevel) String() string {
+	switch level {
+	case GroupNullLevelNone:
+		return "NONE"
+	case GroupNullLevelGiven:
+		return "GivenName"
+	case GroupNullLevelMiddle:
+		return "MiddleName"
+	case GroupNullLevelPrefix:
+		return "NamePrefix"
+	case GroupNullLevelAll:
+		return "ALL"
+	default:
+		return "[INVALID]"
+	}
+}
+
+const (
+	// GroupNullLevelNone will render no null seps.
+	GroupNullLevelNone GroupTrailingNullLevel = iota
+
+	// NullSepGiven will render null separators up to the separator before the
+	// GroupInfo.GivenName segment
+	GroupNullLevelGiven
+
+	// NullSepGiven will render null separators up to the separator before the
+	// GroupInfo.MiddleName segment
+	GroupNullLevelMiddle
+
+	// NullSepGiven will render null separators up to the separator before the
+	// GroupInfo.NamePrefix segment
+	GroupNullLevelPrefix
+
+	// NullSepGiven will render null separators up to the separator before the
+	// GroupInfo.NameSuffix segment (ALL possible separators).
+	GroupNullLevelAll
+)
+
+func validateGroupNullSepLevel(level GroupTrailingNullLevel) error {
+	if level <= GroupNullLevelAll {
+		return nil
+	}
+
+	return newErrNullSepLevelInvalid(uint(GroupNullLevelAll), uint(level))
+}
+
 // GroupInfo holds the parsed information for any one of these groups the person name
 // groups specified in the DICOM spec:
 //
@@ -24,30 +85,42 @@ type GroupInfo struct {
 	// NameSuffix is the person's name suffix (ex: Jr, III).
 	NameSuffix string
 
-	// NoNullSeparators will remove repeated separators around null groups when
-	// calling DCM() if set to true.
-	NoNullSeparators bool
+	// TrailingNullLevel contains the highest present null '^' separator in the DCM()
+	// value. For most use cases GroupNullLevelAll or GroupNullLevelNone should be used when
+	// creating new PN values. Use other levels only if you know what you are doing!
+	TrailingNullLevel GroupTrailingNullLevel
 }
 
 // DCM Returns original, formatted string in
 // '[FamilyName]^[GivenName]^[MiddleName]^[NamePrefix]^[NameSuffix]'.
-func (group GroupInfo) DCM() string {
-	dcmString := strings.Join(
-		[]string{
-			group.FamilyName,
-			group.GivenName,
-			group.MiddleName,
-			group.NamePrefix,
-			group.NameSuffix,
-		},
-		segmentSep,
-	)
-
-	if group.NoNullSeparators {
-		dcmString = strings.TrimRight(dcmString, segmentSep)
+func (group GroupInfo) DCM() (string, error) {
+	// validate our TrailingNullLevel and panic if it is exceeded.
+	if err := validateGroupNullSepLevel(group.TrailingNullLevel); err != nil {
+		return "", err
 	}
 
-	return dcmString
+	// Put all the segments into an array.
+	segments := []string{
+		group.FamilyName,
+		group.GivenName,
+		group.MiddleName,
+		group.NamePrefix,
+		group.NameSuffix,
+	}
+
+	// Render our segments with the correct number of null-separators.
+	return renderWithSeps(segments, segmentSep, uint(group.TrailingNullLevel)), nil
+}
+
+// MustDCM is as DCM, but panics on error.
+//
+// MustDCM will only panic if TrailingNullLevel exceeds GroupNullLevelAll.
+func (group GroupInfo) MustDCM() string {
+	dcm, err := group.DCM()
+	if err != nil {
+		panic(err)
+	}
+	return dcm
 }
 
 // IsEmpty returns true if all group segments are empty, even if Raw value was "^^^^".
@@ -63,15 +136,27 @@ func (group GroupInfo) IsEmpty() bool {
 // Representation of PN to a parsed Info struct.
 func groupFromValueString(groupString string, group pnGroup) (GroupInfo, error) {
 	segments := strings.Split(groupString, segmentSep)
+	segmentCount := len(segments)
 
-	if len(segments) > 5 {
+	if segmentCount > 5 {
 		return GroupInfo{}, newErrTooManyGroupSegments(group, len(segments))
 	}
 
 	groupInfo := GroupInfo{}
 
-	// Range over the groups and assign them based on index.
+	// Start off with our null segment level being None
+	nullSepLevel := GroupNullLevelNone
 	for i, groupValue := range segments {
+		// If this segment is empty, it means there is a null sep here. Our null sep
+		// level needs to reflect this.
+		if groupValue == "" {
+			nullSepLevel = GroupTrailingNullLevel(i)
+		} else {
+			// Otherwise, if there is a non-zero string value, there is no null sep
+			// after it.
+			nullSepLevel = GroupNullLevelNone
+		}
+
 		switch i {
 		case 0:
 			groupInfo.FamilyName = groupValue
@@ -86,10 +171,10 @@ func groupFromValueString(groupString string, group pnGroup) (GroupInfo, error) 
 		}
 	}
 
-	// If there are less than 5 segments, that means trailing separators were not
-	// included, and when we call GroupInfo.DCM(), they should not be rendered.
-	if len(segments) < 5 {
-		groupInfo.NoNullSeparators = true
+	// If the string is not empty, and any of our groups ARE empty, then we are using
+	// null separators.
+	if strings.HasSuffix(groupString, "^") {
+		groupInfo.TrailingNullLevel = nullSepLevel
 	}
 
 	return groupInfo, nil
