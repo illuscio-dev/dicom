@@ -66,6 +66,29 @@ func (t Tag) String() string {
 	return fmt.Sprintf("(%04x,%04x)", t.Group, t.Element)
 }
 
+// VM info stores parsed information about the Value Multiplicity (cardinality) of the
+// tag.
+type VMInfo struct {
+	// The minimum number of values the Value Multiplicity allows
+	Minimum int
+	// The maximum number of values the Value Multiplicity allows. If -1, Maximum
+	// is unbounded. If equal to Minimum, there is only a single VM allowed.
+	Maximum int
+	// Some multiplicities are described like '2-2n', where maximum must be divisible by
+	// 2. In these cases, step will be equal to y for VM = 'x-yn'
+	Step int
+}
+
+// Returns true if value can only be single.
+func (vmInfo VMInfo) IsSingleValue() bool {
+	return vmInfo.Minimum == 1 && vmInfo.Maximum == 1
+}
+
+// Returns true the number of maximum values is unbounded.
+func (vmInfo VMInfo) IsUnbounded() bool {
+	return vmInfo.Maximum == -1
+}
+
 // Info stores detailed information about a Tag defined in the DICOM
 // standard.
 type Info struct {
@@ -76,6 +99,8 @@ type Info struct {
 	Name string
 	// Cardinality (# of values expected in the element)
 	VM string
+	// Parsed Value Multiplicity information extracted from VM.
+	VMInfo VMInfo
 }
 
 // MetadataGroup is the value of Tag.Group for metadata tags.
@@ -159,7 +184,7 @@ func Find(tag Tag) (Info, error) {
 	if !ok {
 		// (0000-u-ffff,0000)	UL	GenericGroupLength	1	GENERIC
 		if tag.Group%2 == 0 && tag.Element == 0x0000 {
-			entry = Info{tag, "UL", "GenericGroupLength", "1"}
+			entry = Info{tag, "UL", "GenericGroupLength", "1", VMInfo{1, 1, 1}}
 		} else {
 			return Info{}, fmt.Errorf("Could not find tag (0x%x, 0x%x) in dictionary", tag.Group, tag.Element)
 		}
