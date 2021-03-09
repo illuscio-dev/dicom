@@ -1,598 +1,283 @@
-package dcmtime
+package dcmtime_test
 
 import (
+	"errors"
+	"github.com/suyashkumar/dicom/pkg/dcmtime"
 	"testing"
 	"time"
 )
 
 func TestParseDatetime(t *testing.T) {
 	testCases := []struct {
+		Name              string
 		DTValue           string
 		Expected          time.Time
-		ExpectedPrecision PrecisionLevel
+		ExpectedPrecision dcmtime.PrecisionLevel
 		HasOffset         bool
 	}{
-		// Full value, positive offset
 		{
-			DTValue: "10100203040506.456789+0102",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone("", 3720),
-			),
-			ExpectedPrecision: PrecisionFull,
+			Name:              "PrecisionFull-PositiveOffset",
+			DTValue:           "10100203040506.456789+0102",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", 3720)),
+			ExpectedPrecision: dcmtime.PrecisionFull,
 			HasOffset:         true,
 		},
-		// Full value, minus 1 millisecond places, positive offset
 		{
-			DTValue: "10100203040506.45678+0102",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456780000,
-				time.FixedZone("", 3720),
-			),
-			ExpectedPrecision: PrecisionMS5,
+			Name:              "PrecisionMS5-PositiveOffset",
+			DTValue:           "10100203040506.45678+0102",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 6, 456780000, time.FixedZone("", 3720)),
+			ExpectedPrecision: dcmtime.PrecisionMS5,
 			HasOffset:         true,
 		},
-		// Full value, minus 2 millisecond places, positive offset
 		{
-			DTValue: "10100203040506.4567+0102",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456700000,
-				time.FixedZone("", 3720),
-			),
-			ExpectedPrecision: PrecisionMS4,
+			Name:              "PrecisionMS4-PositiveOffset",
+			DTValue:           "10100203040506.4567+0102",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 6, 456700000, time.FixedZone("", 3720)),
+			ExpectedPrecision: dcmtime.PrecisionMS4,
 			HasOffset:         true,
 		},
-		// Full value, minus 3 millisecond places, positive offset
 		{
-			DTValue: "10100203040506.456+0102",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456000000,
-				time.FixedZone("", 3720),
-			),
-			ExpectedPrecision: PrecisionMS3,
+			Name:              "PrecisionMS3-PositiveOffset",
+			DTValue:           "10100203040506.456+0102",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 6, 456000000, time.FixedZone("", 3720)),
+			ExpectedPrecision: dcmtime.PrecisionMS3,
 			HasOffset:         true,
 		},
-		// Full value, minus 4 millisecond places, positive offset
 		{
-			DTValue: "10100203040506.45+0102",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				450000000,
-				time.FixedZone("", 3720),
-			),
-			ExpectedPrecision: PrecisionMS2,
+			Name:              "PrecisionMS2-PositiveOffset",
+			DTValue:           "10100203040506.45+0102",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 6, 450000000, time.FixedZone("", 3720)),
+			ExpectedPrecision: dcmtime.PrecisionMS2,
 			HasOffset:         true,
 		},
-		// Full value, minus 5 millisecond places, positive offset
 		{
-			DTValue: "10100203040506.4+0102",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				400000000,
-				time.FixedZone("", 3720),
-			),
-			ExpectedPrecision: PrecisionMS1,
+			Name:              "PrecisionMS1-PositiveOffset",
+			DTValue:           "10100203040506.4+0102",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 6, 400000000, time.FixedZone("", 3720)),
+			ExpectedPrecision: dcmtime.PrecisionMS1,
 			HasOffset:         true,
 		},
-		// Full value, no millisecond, positive offset
 		{
-			DTValue: "10100203040506+0102",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				0,
-				time.FixedZone("", 3720),
-			),
-			ExpectedPrecision: PrecisionSeconds,
+			Name:              "PrecisionSeconds-PositiveOffset",
+			DTValue:           "10100203040506+0102",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 6, 0, time.FixedZone("", 3720)),
+			ExpectedPrecision: dcmtime.PrecisionSeconds,
 			HasOffset:         true,
 		},
-		// Full value, no seconds, positive offset
 		{
-			DTValue: "101002030405+0102",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				0,
-				0,
-				time.FixedZone("", 3720),
-			),
-			ExpectedPrecision: PrecisionMinutes,
+			Name:              "PrecisionMinutes-PositiveOffset",
+			DTValue:           "101002030405+0102",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 0, 0, time.FixedZone("", 3720)),
+			ExpectedPrecision: dcmtime.PrecisionMinutes,
 			HasOffset:         true,
 		},
-		// Full value, no minutes, positive offset
 		{
-			DTValue: "1010020304+0102",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				0,
-				0,
-				0,
-				time.FixedZone("", 3720),
-			),
-			ExpectedPrecision: PrecisionHours,
+			Name:              "PrecisionHours-PositiveOffset",
+			DTValue:           "1010020304+0102",
+			Expected:          time.Date(1010, 2, 3, 4, 0, 0, 0, time.FixedZone("", 3720)),
+			ExpectedPrecision: dcmtime.PrecisionHours,
 			HasOffset:         true,
 		},
-		// Full value, no hours, positive offset
 		{
-			DTValue: "10100203+0102",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				0,
-				0,
-				0,
-				0,
-				time.FixedZone("", 3720),
-			),
-			ExpectedPrecision: PrecisionDay,
+			Name:              "PrecisionDay-PositiveOffset",
+			DTValue:           "10100203+0102",
+			Expected:          time.Date(1010, 2, 3, 0, 0, 0, 0, time.FixedZone("", 3720)),
+			ExpectedPrecision: dcmtime.PrecisionDay,
 			HasOffset:         true,
 		},
-		// Full value, no hours, positive offset
 		{
-			DTValue: "101002+0102",
-			Expected: time.Date(
-				1010,
-				2,
-				1,
-				0,
-				0,
-				0,
-				0,
-				time.FixedZone("", 3720),
-			),
-			ExpectedPrecision: PrecisionMonth,
+			Name:              "PrecisionMonth-PositiveOffset",
+			DTValue:           "101002+0102",
+			Expected:          time.Date(1010, 2, 1, 0, 0, 0, 0, time.FixedZone("", 3720)),
+			ExpectedPrecision: dcmtime.PrecisionMonth,
 			HasOffset:         true,
 		},
-		// Full value, no hours, positive offset
 		{
-			DTValue: "1010+0102",
-			Expected: time.Date(
-				1010,
-				1,
-				1,
-				0,
-				0,
-				0,
-				0,
-				time.FixedZone("", 3720),
-			),
-			ExpectedPrecision: PrecisionYear,
+			Name:              "PrecisionYear-PositiveOffset",
+			DTValue:           "1010+0102",
+			Expected:          time.Date(1010, 1, 1, 0, 0, 0, 0, time.FixedZone("", 3720)),
+			ExpectedPrecision: dcmtime.PrecisionYear,
 			HasOffset:         true,
 		},
-		// Full value, negative offset
 		{
-			DTValue: "10100203040506.456789-0102",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone("", -3720),
-			),
-			ExpectedPrecision: PrecisionFull,
+			Name:              "PrecisionFull-NegativeOffset",
+			DTValue:           "10100203040506.456789-0102",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedPrecision: dcmtime.PrecisionFull,
 			HasOffset:         true,
 		},
-		// Full value, negative offset, minus 1 millisecond places
 		{
-			DTValue: "10100203040506.45678-0102",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456780000,
-				time.FixedZone("", -3720),
-			),
-			ExpectedPrecision: PrecisionMS5,
+			Name:              "PrecisionMS5-NegativeOffset",
+			DTValue:           "10100203040506.45678-0102",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 6, 456780000, time.FixedZone("", -3720)),
+			ExpectedPrecision: dcmtime.PrecisionMS5,
 			HasOffset:         true,
 		},
-		// Full value, negative offset, minus 2 millisecond places
 		{
-			DTValue: "10100203040506.4567-0102",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456700000,
-				time.FixedZone("", -3720),
-			),
-			ExpectedPrecision: PrecisionMS4,
+			Name:              "PrecisionMS4-NegativeOffset",
+			DTValue:           "10100203040506.4567-0102",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 6, 456700000, time.FixedZone("", -3720)),
+			ExpectedPrecision: dcmtime.PrecisionMS4,
 			HasOffset:         true,
 		},
-		// Full value, negative offset, minus 3 millisecond places
 		{
-			DTValue: "10100203040506.456-0102",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456000000,
-				time.FixedZone("", -3720),
-			),
-			ExpectedPrecision: PrecisionMS3,
+			Name:              "PrecisionMS3-NegativeOffset",
+			DTValue:           "10100203040506.456-0102",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 6, 456000000, time.FixedZone("", -3720)),
+			ExpectedPrecision: dcmtime.PrecisionMS3,
 			HasOffset:         true,
 		},
-		// Full value, negative offset, minus 4 millisecond places
 		{
-			DTValue: "10100203040506.45-0102",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				450000000,
-				time.FixedZone("", -3720),
-			),
-			ExpectedPrecision: PrecisionMS2,
+			Name:              "PrecisionMS2-NegativeOffset",
+			DTValue:           "10100203040506.45-0102",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 6, 450000000, time.FixedZone("", -3720)),
+			ExpectedPrecision: dcmtime.PrecisionMS2,
 			HasOffset:         true,
 		},
-		// Full value, negative offset, minus 5 millisecond places
 		{
-			DTValue: "10100203040506.4-0102",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				400000000,
-				time.FixedZone("", -3720),
-			),
-			ExpectedPrecision: PrecisionMS1,
+			Name:              "PrecisionMS1-NegativeOffset",
+			DTValue:           "10100203040506.4-0102",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 6, 400000000, time.FixedZone("", -3720)),
+			ExpectedPrecision: dcmtime.PrecisionMS1,
 			HasOffset:         true,
 		},
-		// Full value, negative offset, no milliseconds
 		{
-			DTValue: "10100203040506-0102",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				000000000,
-				time.FixedZone("", -3720),
-			),
-			ExpectedPrecision: PrecisionSeconds,
+			Name:              "PrecisionSeconds-NegativeOffset",
+			DTValue:           "10100203040506-0102",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 6, 000000000, time.FixedZone("", -3720)),
+			ExpectedPrecision: dcmtime.PrecisionSeconds,
 			HasOffset:         true,
 		},
-		// Full value, negative offset, no seconds
 		{
-			DTValue: "101002030405-0102",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				0,
-				000000000,
-				time.FixedZone("", -3720),
-			),
-			ExpectedPrecision: PrecisionMinutes,
+			Name:              "PrecisionMinutes-NegativeOffset",
+			DTValue:           "101002030405-0102",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 0, 000000000, time.FixedZone("", -3720)),
+			ExpectedPrecision: dcmtime.PrecisionMinutes,
 			HasOffset:         true,
 		},
-		// Full value, negative offset, no minutes
 		{
-			DTValue: "1010020304-0102",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				0,
-				0,
-				000000000,
-				time.FixedZone("", -3720),
-			),
-			ExpectedPrecision: PrecisionHours,
+			Name:              "PrecisionHours-NegativeOffset",
+			DTValue:           "1010020304-0102",
+			Expected:          time.Date(1010, 2, 3, 4, 0, 0, 000000000, time.FixedZone("", -3720)),
+			ExpectedPrecision: dcmtime.PrecisionHours,
 			HasOffset:         true,
 		},
-		// Full value, negative offset, no hours
 		{
-			DTValue: "10100203-0102",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				0,
-				0,
-				0,
-				000000000,
-				time.FixedZone("", -3720),
-			),
-			ExpectedPrecision: PrecisionDay,
+			Name:              "PrecisionDay-NegativeOffset",
+			DTValue:           "10100203-0102",
+			Expected:          time.Date(1010, 2, 3, 0, 0, 0, 000000000, time.FixedZone("", -3720)),
+			ExpectedPrecision: dcmtime.PrecisionDay,
 			HasOffset:         true,
 		},
-		// Full value, negative offset, no days
 		{
-			DTValue: "101002-0102",
-			Expected: time.Date(
-				1010,
-				2,
-				1,
-				0,
-				0,
-				0,
-				000000000,
-				time.FixedZone("", -3720),
-			),
-			ExpectedPrecision: PrecisionMonth,
+			Name:              "PrecisionMonth-NegativeOffset",
+			DTValue:           "101002-0102",
+			Expected:          time.Date(1010, 2, 1, 0, 0, 0, 000000000, time.FixedZone("", -3720)),
+			ExpectedPrecision: dcmtime.PrecisionMonth,
 			HasOffset:         true,
 		},
-		// Full value, negative offset, no month
 		{
-			DTValue: "1010-0102",
-			Expected: time.Date(
-				1010,
-				1,
-				1,
-				0,
-				0,
-				0,
-				000000000,
-				time.FixedZone("", -3720),
-			),
-			ExpectedPrecision: PrecisionYear,
+			Name:              "PrecisionYear-NegativeOffset",
+			DTValue:           "1010-0102",
+			Expected:          time.Date(1010, 1, 1, 0, 0, 0, 000000000, time.FixedZone("", -3720)),
+			ExpectedPrecision: dcmtime.PrecisionYear,
 			HasOffset:         true,
 		},
-		// Full value, no offset
 		{
-			DTValue: "10100203040506.456789",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.UTC,
-			),
-			ExpectedPrecision: PrecisionFull,
+			Name:              "PrecisionFull-NoOffset",
+			DTValue:           "10100203040506.456789",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.UTC),
+			ExpectedPrecision: dcmtime.PrecisionFull,
 			HasOffset:         false,
 		},
-		// Full value, no offset, minus 1 millisecond place
 		{
-			DTValue: "10100203040506.45678",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456780000,
-				time.UTC,
-			),
-			ExpectedPrecision: PrecisionMS5,
+			Name:              "PrecisionMS5-NoOffset",
+			DTValue:           "10100203040506.45678",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 6, 456780000, time.UTC),
+			ExpectedPrecision: dcmtime.PrecisionMS5,
 			HasOffset:         false,
 		},
-		// Full value, no offset, minus 2 millisecond place
 		{
-			DTValue: "10100203040506.4567",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456700000,
-				time.UTC,
-			),
-			ExpectedPrecision: PrecisionMS4,
+			Name:              "PrecisionMS4-NoOffset",
+			DTValue:           "10100203040506.4567",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 6, 456700000, time.UTC),
+			ExpectedPrecision: dcmtime.PrecisionMS4,
 			HasOffset:         false,
 		},
-		// Full value, no offset, minus 3 millisecond place
 		{
-			DTValue: "10100203040506.456",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456000000,
-				time.UTC,
-			),
-			ExpectedPrecision: PrecisionMS3,
+			Name:              "PrecisionMS3-NoOffset",
+			DTValue:           "10100203040506.456",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 6, 456000000, time.UTC),
+			ExpectedPrecision: dcmtime.PrecisionMS3,
 			HasOffset:         false,
 		},
-		// Full value, no offset, minus 4 millisecond place
 		{
-			DTValue: "10100203040506.45",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				450000000,
-				time.UTC,
-			),
-			ExpectedPrecision: PrecisionMS2,
+			Name:              "PrecisionMS2-NoOffset",
+			DTValue:           "10100203040506.45",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 6, 450000000, time.UTC),
+			ExpectedPrecision: dcmtime.PrecisionMS2,
 			HasOffset:         false,
 		},
-		// Full value, no offset, minus 5 millisecond place
 		{
-			DTValue: "10100203040506.4",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				400000000,
-				time.UTC,
-			),
-			ExpectedPrecision: PrecisionMS1,
+			Name:              "PrecisionMS1-NoOffset",
+			DTValue:           "10100203040506.4",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 6, 400000000, time.UTC),
+			ExpectedPrecision: dcmtime.PrecisionMS1,
 			HasOffset:         false,
 		},
-		// Full value, no offset, no milliseconds
 		{
-			DTValue: "10100203040506",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				0,
-				time.UTC,
-			),
-			ExpectedPrecision: PrecisionSeconds,
+			Name:              "PrecisionSeconds-NoOffset",
+			DTValue:           "10100203040506",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 6, 0, time.UTC),
+			ExpectedPrecision: dcmtime.PrecisionSeconds,
 			HasOffset:         false,
 		},
-		// Full value, no offset, no seconds
 		{
-			DTValue: "101002030405",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				0,
-				0,
-				time.UTC,
-			),
-			ExpectedPrecision: PrecisionMinutes,
+			Name:              "PrecisionMinutes-NoOffset",
+			DTValue:           "101002030405",
+			Expected:          time.Date(1010, 2, 3, 4, 5, 0, 0, time.UTC),
+			ExpectedPrecision: dcmtime.PrecisionMinutes,
 			HasOffset:         false,
 		},
-		// Full value, no offset, no minutes
 		{
-			DTValue: "1010020304",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				0,
-				0,
-				0,
-				time.UTC,
-			),
-			ExpectedPrecision: PrecisionHours,
+			Name:              "PrecisionHours-NoOffset",
+			DTValue:           "1010020304",
+			Expected:          time.Date(1010, 2, 3, 4, 0, 0, 0, time.UTC),
+			ExpectedPrecision: dcmtime.PrecisionHours,
 			HasOffset:         false,
 		},
-		// Full value, no offset, no seconds
+
+		// Full value, no offset, no hours
 		{
-			DTValue: "10100203",
-			Expected: time.Date(
-				1010,
-				2,
-				3,
-				0,
-				0,
-				0,
-				0,
-				time.UTC,
-			),
-			ExpectedPrecision: PrecisionDay,
+			Name:              "PrecisionDay-NoOffset",
+			DTValue:           "10100203",
+			Expected:          time.Date(1010, 2, 3, 0, 0, 0, 0, time.UTC),
+			ExpectedPrecision: dcmtime.PrecisionDay,
 			HasOffset:         false,
 		},
+
 		// Full value, no offset, no days
 		{
-			DTValue: "101002",
-			Expected: time.Date(
-				1010,
-				2,
-				1,
-				0,
-				0,
-				0,
-				0,
-				time.UTC,
-			),
-			ExpectedPrecision: PrecisionMonth,
+			Name:              "PrecisionMonth-NoOffset",
+			DTValue:           "101002",
+			Expected:          time.Date(1010, 2, 1, 0, 0, 0, 0, time.UTC),
+			ExpectedPrecision: dcmtime.PrecisionMonth,
 			HasOffset:         false,
 		},
+
 		// Full value, no offset, no month
 		{
-			DTValue: "1010",
-			Expected: time.Date(
-				1010,
-				1,
-				1,
-				0,
-				0,
-				0,
-				0,
-				time.UTC,
-			),
-			ExpectedPrecision: PrecisionYear,
+			Name:              "PrecisionYear-NoOffset",
+			DTValue:           "1010",
+			Expected:          time.Date(1010, 1, 1, 0, 0, 0, 0, time.UTC),
+			ExpectedPrecision: dcmtime.PrecisionYear,
 			HasOffset:         false,
 		},
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.DTValue, func(t *testing.T) {
-			parsed, err := ParseDatetime(tc.DTValue)
+		t.Run(tc.Name, func(t *testing.T) {
+			parsed, err := dcmtime.ParseDatetime(tc.DTValue)
 			if err != nil {
 				t.Fatal("parse err:", err)
 			}
@@ -617,524 +302,416 @@ func TestParseDatetime(t *testing.T) {
 	}
 }
 
-func TestDatetime_DCM(t *testing.T) {
+func TestParseDatetimeErr(t *testing.T) {
 	testCases := []struct {
-		TimeVal   time.Time
-		Expected  string
-		Precision PrecisionLevel
-		NoOffset  bool
+		Name     string
+		BadValue string
 	}{
-		// Full Precision, with offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "10100203040506.456789-0102",
-			Precision: PrecisionFull,
-			NoOffset:  false,
+			Name:     "TotallyWrong",
+			BadValue: "notaDT",
 		},
-		// Full Precision, with offset, fractal leading zero
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "10100203040506.000456-0102",
-			Precision: PrecisionFull,
-			NoOffset:  false,
+			Name:     "ContainsValidHead",
+			BadValue: "10100203040506.456789+0102SomeText",
 		},
-		// Full Precision, truncate trailing nanos
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789999,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "10100203040506.456789-0102",
-			Precision: PrecisionFull,
-			NoOffset:  false,
+			Name:     "ContainsValidHead_LineBreak",
+			BadValue: "10100203040506.456789+0102\nSomeText",
 		},
-		// Full Precision, no offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "10100203040506.456789",
-			Precision: PrecisionFull,
-			NoOffset:  true,
+			Name:     "ContainsValidHead_WhiteSpace",
+			BadValue: "10100203040506.456789+0102 SomeText",
 		},
-		// -1 Precision, with offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "10100203040506.45678-0102",
-			Precision: PrecisionMS5,
-			NoOffset:  false,
+			Name:     "ContainsValidTail",
+			BadValue: "SomeText10100203040506.456789+0102",
 		},
-		// -1 Precision, no offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "10100203040506.45678",
-			Precision: PrecisionMS5,
-			NoOffset:  true,
+			Name:     "ContainsValidTail_LineBreak",
+			BadValue: "SomeText\n10100203040506.456789+0102",
 		},
-		// -2 Precision, with offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "10100203040506.4567-0102",
-			Precision: PrecisionMS4,
-			NoOffset:  false,
+			Name:     "ContainsValidTail_WhiteSpace",
+			BadValue: "SomeText 10100203040506.456789+0102",
 		},
-		// -2 Precision, no offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "10100203040506.4567",
-			Precision: PrecisionMS4,
-			NoOffset:  true,
+			Name:     "ExtraDigit_TZ",
+			BadValue: "10100203040506.456789+01023",
 		},
-		// -3 Precision, with offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "10100203040506.456-0102",
-			Precision: PrecisionMS3,
-			NoOffset:  false,
+			Name:     "MissingDigit_TZ",
+			BadValue: "10100203040506.456789+010",
 		},
-		// -3 Precision, with offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "10100203040506.456",
-			Precision: PrecisionMS3,
-			NoOffset:  true,
+			Name:     "TZ_NoMinutes",
+			BadValue: "10100203040506.456789+01",
 		},
-		// -4 Precision, with offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "10100203040506.45-0102",
-			Precision: PrecisionMS2,
-			NoOffset:  false,
+			Name:     "TZ_SingleDigit",
+			BadValue: "10100203040506.456789+1",
 		},
-		// -4 Precision, with offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "10100203040506.45",
-			Precision: PrecisionMS2,
-			NoOffset:  true,
+			Name:     "TZ_DoubleSign",
+			BadValue: "10100203040506.456789++0102",
 		},
-		// -5 Precision, with offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "10100203040506.4-0102",
-			Precision: PrecisionMS1,
-			NoOffset:  false,
+			Name:     "TZ_BadSign",
+			BadValue: "10100203040506.456789&0102",
 		},
-		// -5 Precision, with offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "10100203040506.4",
-			Precision: PrecisionMS1,
-			NoOffset:  true,
+			Name:     "ExtraDigit_Milliseconds",
+			BadValue: "10100203040506.4567891+0102",
 		},
-		// -6 Precision, with offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "10100203040506-0102",
-			Precision: PrecisionSeconds,
-			NoOffset:  false,
+			Name:     "ExtraDigit_Milliseconds_NoTZ",
+			BadValue: "10100203040506.4567891",
 		},
-		// -6 Precision, with offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "10100203040506",
-			Precision: PrecisionSeconds,
-			NoOffset:  true,
+			Name:     "ExtraDigit_Seconds",
+			BadValue: "101002030405061.456789+0102",
 		},
-		// -7 Precision, with offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "101002030405-0102",
-			Precision: PrecisionMinutes,
-			NoOffset:  false,
+			Name:     "ExtraDigit_Seconds_NoTZ",
+			BadValue: "101002030405061.456789",
 		},
-		// -7 Precision, with offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "101002030405",
-			Precision: PrecisionMinutes,
-			NoOffset:  true,
+			Name:     "ExtraDigit_Seconds_NoMilliseconds",
+			BadValue: "101002030405061",
 		},
-		// -8 Precision, with offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "1010020304-0102",
-			Precision: PrecisionHours,
-			NoOffset:  false,
+			Name:     "MissingDigit_Seconds",
+			BadValue: "1010020304056.456789+0102",
 		},
-		// -8 Precision, with offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "1010020304",
-			Precision: PrecisionHours,
-			NoOffset:  true,
+			Name:     "MissingDigit_Seconds_NoTZ",
+			BadValue: "1010020304056.456789",
 		},
-		// -9 Precision, with offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "10100203-0102",
-			Precision: PrecisionDay,
-			NoOffset:  false,
+			Name:     "MissingDigit_Seconds_NoMilliseconds",
+			BadValue: "1010020304056",
 		},
-		// -9 Precision, with offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "10100203",
-			Precision: PrecisionDay,
-			NoOffset:  true,
+			Name:     "MissingDigit_Minutes",
+			BadValue: "10100203045.456789+0102",
 		},
-		// -10 Precision, with offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "101002-0102",
-			Precision: PrecisionMonth,
-			NoOffset:  false,
+			Name:     "MissingDigit_Minutes_NoTZ",
+			BadValue: "10100203045.456789",
 		},
-		// -10 Precision, with offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "101002",
-			Precision: PrecisionMonth,
-			NoOffset:  true,
+			Name:     "MissingDigit_Minutes_NoMilliseconds",
+			BadValue: "10100203045",
 		},
-		// -11 Precision, with offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "1010-0102",
-			Precision: PrecisionYear,
-			NoOffset:  false,
+			Name:     "MissingDigit_Hours",
+			BadValue: "101002034.456789+0102",
 		},
-		// -11 Precision, with offset
 		{
-			TimeVal: time.Date(
-				1010,
-				2,
-				3,
-				4,
-				5,
-				6,
-				456789000,
-				time.FixedZone(
-					"",
-					-3720,
-				),
-			),
-			Expected:  "1010",
-			Precision: PrecisionYear,
-			NoOffset:  true,
+			Name:     "MissingDigit_Hours_NoTZ",
+			BadValue: "101002034.456789",
+		},
+		{
+			Name:     "MissingDigit_Hours_NoMilliseconds",
+			BadValue: "101002034",
+		},
+		{
+			Name:     "MissingDigit_Days",
+			BadValue: "1010023.456789+0102",
+		},
+		{
+			Name:     "MissingDigit_Days_NoTZ",
+			BadValue: "1010023.456789",
+		},
+		{
+			Name:     "MissingDigit_Days_NoMilliseconds",
+			BadValue: "1010023",
+		},
+		{
+			Name:     "MissingDigit_Months",
+			BadValue: "10102.456789+0102",
+		},
+		{
+			Name:     "MissingDigit_Months_NoTZ",
+			BadValue: "10102.456789",
+		},
+		{
+			Name:     "MissingDigit_Months_NoMilliseconds",
+			BadValue: "10102.456789",
+		},
+		{
+			Name:     "MissingDigit_Years",
+			BadValue: "101.456789+0102",
+		},
+		{
+			Name:     "MissingDigit_Years_NoTZ",
+			BadValue: "101.456789",
+		},
+		{
+			Name:     "MissingDigit_Years_NoMilliseconds",
+			BadValue: "101.456789",
+		},
+		{
+			Name:     "NoMillisecondsWithSeparator",
+			BadValue: "10100203040506.",
 		},
 	}
 
 	for _, tc := range testCases {
-		name := tc.Expected
-		if tc.NoOffset {
-			name += "_NoOffset"
-		}
-		t.Run(name, func(t *testing.T) {
-			dt := Datetime{
-				Time:      tc.TimeVal,
-				Precision: tc.Precision,
-				NoOffset:  tc.NoOffset,
+		t.Run(tc.Name, func(t *testing.T) {
+			_, err := dcmtime.ParseDatetime(tc.BadValue)
+			if !errors.Is(err, dcmtime.ErrParseDT) {
+				t.Errorf("expected ErrParseDT from ParseDatetime(), got %v", err)
 			}
+		})
+	}
+}
 
-			if dt.DCM() != tc.Expected {
-				t.Errorf("DCM(): expected '%v', got '%v'", tc.Expected, dt.DCM())
-			}
+func TestDatetime_Methods(t *testing.T) {
+	testCases := []struct {
+		Name           string
+		TimeVal        time.Time
+		ExpectedDCM    string
+		ExpectedString string
+		Precision      dcmtime.PrecisionLevel
+		NoOffset       bool
+	}{
+		{
+			Name:           "PrecisionFull-WithOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "10100203040506.456789-0102",
+			ExpectedString: "1010-02-03 04:05:06.456789 -01:02",
+			Precision:      dcmtime.PrecisionFull,
+			NoOffset:       false,
+		},
+		{
+			Name:           "PrecisionFull-WithOffset-MSLeadingZeroes",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789, time.FixedZone("", -3720)),
+			ExpectedDCM:    "10100203040506.000456-0102",
+			ExpectedString: "1010-02-03 04:05:06.000456 -01:02",
+			Precision:      dcmtime.PrecisionFull,
+			NoOffset:       false,
+		},
+		{
+			Name:           "PrecisionFull-WithOffset-TruncateNanos",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789999, time.FixedZone("", -3720)),
+			ExpectedDCM:    "10100203040506.456789-0102",
+			ExpectedString: "1010-02-03 04:05:06.456789 -01:02",
+			Precision:      dcmtime.PrecisionFull,
+			NoOffset:       false,
+		},
+		{
+			Name:           "PrecisionFull-NoOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "10100203040506.456789",
+			ExpectedString: "1010-02-03 04:05:06.456789",
+			Precision:      dcmtime.PrecisionFull,
+			NoOffset:       true,
+		},
+		{
+			Name:           "PrecisionMS5-WithOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "10100203040506.45678-0102",
+			ExpectedString: "1010-02-03 04:05:06.45678 -01:02",
+			Precision:      dcmtime.PrecisionMS5,
+			NoOffset:       false,
+		},
+		{
+			Name:           "PrecisionMS5-NoOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "10100203040506.45678",
+			ExpectedString: "1010-02-03 04:05:06.45678",
+			Precision:      dcmtime.PrecisionMS5,
+			NoOffset:       true,
+		},
+		{
+			Name:           "PrecisionMS4-WithOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "10100203040506.4567-0102",
+			ExpectedString: "1010-02-03 04:05:06.4567 -01:02",
+			Precision:      dcmtime.PrecisionMS4,
+			NoOffset:       false,
+		},
+		{
+			Name:           "PrecisionMS4-NoOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "10100203040506.4567",
+			ExpectedString: "1010-02-03 04:05:06.4567",
+			Precision:      dcmtime.PrecisionMS4,
+			NoOffset:       true,
+		},
+		{
+			Name:           "PrecisionMS3-WithOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "10100203040506.456-0102",
+			ExpectedString: "1010-02-03 04:05:06.456 -01:02",
+			Precision:      dcmtime.PrecisionMS3,
+			NoOffset:       false,
+		},
+		{
+			Name:           "PrecisionMS3-NoOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "10100203040506.456",
+			ExpectedString: "1010-02-03 04:05:06.456",
+			Precision:      dcmtime.PrecisionMS3,
+			NoOffset:       true,
+		},
+		{
+			Name:           "PrecisionMS2-WithOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "10100203040506.45-0102",
+			ExpectedString: "1010-02-03 04:05:06.45 -01:02",
+			Precision:      dcmtime.PrecisionMS2,
+			NoOffset:       false,
+		},
+		{
+			Name:           "PrecisionMS2-NoOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "10100203040506.45",
+			ExpectedString: "1010-02-03 04:05:06.45",
+			Precision:      dcmtime.PrecisionMS2,
+			NoOffset:       true,
+		},
+		{
+			Name:           "PrecisionMS1-WithOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "10100203040506.4-0102",
+			ExpectedString: "1010-02-03 04:05:06.4 -01:02",
+			Precision:      dcmtime.PrecisionMS1,
+			NoOffset:       false,
+		},
+		{
+			Name:           "PrecisionMS1-NoOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "10100203040506.4",
+			ExpectedString: "1010-02-03 04:05:06.4",
+			Precision:      dcmtime.PrecisionMS1,
+			NoOffset:       true,
+		},
+		{
+			Name:           "PrecisionSeconds-WithOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "10100203040506-0102",
+			ExpectedString: "1010-02-03 04:05:06 -01:02",
+			Precision:      dcmtime.PrecisionSeconds,
+			NoOffset:       false,
+		},
+		{
+			Name:           "PrecisionSeconds-NoOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "10100203040506",
+			ExpectedString: "1010-02-03 04:05:06",
+			Precision:      dcmtime.PrecisionSeconds,
+			NoOffset:       true,
+		},
+		{
+			Name:           "PrecisionMinutes-WithOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "101002030405-0102",
+			ExpectedString: "1010-02-03 04:05 -01:02",
+			Precision:      dcmtime.PrecisionMinutes,
+			NoOffset:       false,
+		},
+		{
+			Name:           "PrecisionMinutes-NoOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "101002030405",
+			ExpectedString: "1010-02-03 04:05",
+			Precision:      dcmtime.PrecisionMinutes,
+			NoOffset:       true,
+		},
+		{
+			Name:           "PrecisionHours-WithOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "1010020304-0102",
+			ExpectedString: "1010-02-03 04 -01:02",
+			Precision:      dcmtime.PrecisionHours,
+			NoOffset:       false,
+		},
+		{
+			Name:           "PrecisionHours-NoOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "1010020304",
+			ExpectedString: "1010-02-03 04",
+			Precision:      dcmtime.PrecisionHours,
+			NoOffset:       true,
+		},
+		{
+			Name:           "PrecisionDay-WithOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "10100203-0102",
+			ExpectedString: "1010-02-03 -01:02",
+			Precision:      dcmtime.PrecisionDay,
+			NoOffset:       false,
+		},
+		{
+			Name:           "PrecisionDay-NoOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "10100203",
+			ExpectedString: "1010-02-03",
+			Precision:      dcmtime.PrecisionDay,
+			NoOffset:       true,
+		},
+		{
+			Name:           "PrecisionMonth-WithOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "101002-0102",
+			ExpectedString: "1010-02 -01:02",
+			Precision:      dcmtime.PrecisionMonth,
+			NoOffset:       false,
+		},
+		{
+			Name:           "PrecisionMonth-NoOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "101002",
+			ExpectedString: "1010-02",
+			Precision:      dcmtime.PrecisionMonth,
+			NoOffset:       true,
+		},
+		{
+			Name:           "PrecisionYear-WithOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "1010-0102",
+			ExpectedString: "1010 -01:02",
+			Precision:      dcmtime.PrecisionYear,
+			NoOffset:       false,
+		},
+		{
+			Name:           "PrecisionYear-NoOffset",
+			TimeVal:        time.Date(1010, 2, 3, 4, 5, 6, 456789000, time.FixedZone("", -3720)),
+			ExpectedDCM:    "1010",
+			ExpectedString: "1010",
+			Precision:      dcmtime.PrecisionYear,
+			NoOffset:       true,
+		},
+	}
+
+	for _, tc := range testCases {
+		dt := dcmtime.Datetime{
+			Time:      tc.TimeVal,
+			Precision: tc.Precision,
+			NoOffset:  tc.NoOffset,
+		}
+
+		// Run one master sub-test for each case
+		t.Run(tc.Name, func(t *testing.T) {
+
+			// Break out methods into sub-sub tests
+			t.Run("DCM()", func(t *testing.T) {
+				dcmVal := dt.DCM()
+				if dcmVal != tc.ExpectedDCM {
+					t.Errorf("DCM(): expected '%v', got '%v'", tc.ExpectedDCM, dcmVal)
+				}
+			})
+
+			t.Run("String()", func(t *testing.T) {
+				strVal := dt.String()
+				if strVal != tc.ExpectedString {
+					t.Errorf(
+						"String(): expected '%v', got '%v'", tc.ExpectedString, strVal,
+					)
+				}
+			})
 		})
 	}
 }

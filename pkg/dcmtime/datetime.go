@@ -1,7 +1,7 @@
 package dcmtime
 
 import (
-	"fmt"
+	"strings"
 	"time"
 )
 
@@ -22,52 +22,58 @@ type Datetime struct {
 //
 // If NoOffset is true, no offset will be encoded.
 func (dt Datetime) DCM() string {
+	builder := strings.Builder{}
+
 	// We start by using the existing DA and TM formatters, since the bulk of datetime
 	// is just those two formats slammed together.
-	dtVal := Date{Time: dt.Time, Precision: dt.Precision}.DCM()
+	builder.WriteString(Date{Time: dt.Time, Precision: dt.Precision}.DCM())
 
 	// Check that at lead
 	if isIncluded(PrecisionHours, dt.Precision) {
-		dtVal += Time{Time: dt.Time, Precision: dt.Precision}.DCM()
+		builder.WriteString(Time{Time: dt.Time, Precision: dt.Precision}.DCM())
 	}
 
 	// If we are not rendering the offset, return the current value
 	if dt.NoOffset {
-		return dtVal
+		return builder.String()
 	}
 
-	// Get the seconds offset from the zone.
-	_, offset := dt.Time.Zone()
+	// Write the timezone info.
+	builder.WriteString(dt.Time.Format("-0700"))
 
-	// Deduce the offset sign, then invert the offset to positive if it is negative.
-	offsetSign := "+"
-	if offset < 0 {
-		offsetSign = "-"
-		offset *= -1
-	}
-
-	// Divide seconds by 60 to get minutes
-	offsetMinutes := offset / 60
-	// Hours equal minutes divided by 60
-	offsetHours := offsetMinutes / 60
-	// Set minutes to remainder of minutes divided by 60
-	offsetMinutes %= 60
-
-	// Add the offset string.
-	dtVal += fmt.Sprintf("%v%02d%02d", offsetSign, offsetHours, offsetMinutes)
-	return dtVal
+	return builder.String()
 }
 
 // String implements fmt.Stringer.
 func (dt Datetime) String() string {
-	return dt.DCM()
+	builder := strings.Builder{}
+
+	// We start by using the existing DA and TM formatters, since the bulk of datetime
+	// is just those two formats slammed together.
+	builder.WriteString(Date{Time: dt.Time, Precision: dt.Precision}.String())
+
+	// Check that at lead
+	if isIncluded(PrecisionHours, dt.Precision) {
+		builder.WriteRune(' ')
+		builder.WriteString(Time{Time: dt.Time, Precision: dt.Precision}.String())
+	}
+
+	// If we are not rendering the offset, return the current value
+	if dt.NoOffset {
+		return builder.String()
+	}
+
+	// Write the timezone info.
+	builder.WriteString(dt.Time.Format(" -07:00"))
+
+	return builder.String()
 }
 
 // ParseDatetime converts DICOM DT (datetime) value to time.Time, PrecisionLevel, and
 // offset presence as UTC.
 func ParseDatetime(dtString string) (Datetime, error) {
 	matches := dtRegex.FindStringSubmatch(dtString)
-	if !hasMatches(matches, dtString) {
+	if len(matches) == 0 {
 		return Datetime{}, ErrParseDT
 	}
 
@@ -83,7 +89,7 @@ func ParseDatetime(dtString string) (Datetime, error) {
 		return Datetime{}, err
 	}
 
-	var hasOffet bool
+	var hasOffset bool
 
 	offsetHours, err := extractDurationInfo(matches, dtRegexGroupOffsetHours, false)
 	if err != nil {
@@ -91,8 +97,8 @@ func ParseDatetime(dtString string) (Datetime, error) {
 	}
 	// If hours are not present, there is either no offset or the regex will fail,
 	// so we only need to check this here.
-	if offsetHours.Present {
-		hasOffet = true
+	if offsetHours.PresentInSource {
+		hasOffset = true
 	}
 
 	offsetMinutes, err := extractDurationInfo(matches, dtRegexGroupOffsetMinutes, false)
@@ -127,6 +133,6 @@ func ParseDatetime(dtString string) (Datetime, error) {
 	return Datetime{
 		Time:      parsed,
 		Precision: precision,
-		NoOffset:  hasOffet,
+		NoOffset:  hasOffset,
 	}, nil
 }

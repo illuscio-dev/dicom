@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Returns whether `check` is included in `limit`.
+// isIncluded returns whether `check` is included in `limit`.
 //
 // Example: to test whether seconds should be included, you would:
 // isIncluded(PrecisionSeconds, [caller-passed-limit])
@@ -16,49 +16,55 @@ func isIncluded(check PrecisionLevel, precision PrecisionLevel) bool {
 	return check <= precision
 }
 
-// Truncate nanosecond time.Time value to arbitrary precision.
-func truncateMilliseconds(
-	nanoSeconds int, precision PrecisionLevel,
-) (millisecondsStr string) {
+// truncateMilliseconds truncate nanosecond time.Time value to arbitrary precision.
+func truncateMilliseconds(nanoSeconds int, precision PrecisionLevel) (millis string) {
 	milliseconds := nanoSeconds / 1000
-	millisecondsStr = fmt.Sprintf("%06d", milliseconds)
-	millisecondsStr = millisecondsStr[:6-(PrecisionFull-precision)]
+	millis = fmt.Sprintf("%06d", milliseconds)
+	millis = millis[:6-(PrecisionFull-precision)]
 
-	return millisecondsStr
+	return millis
 }
 
 // Const for time.Time timezone. We don't want a timezone because we don't REALLY know
 // that a TM or DA value is UTC, so we don't want UTC to be made explicit.
 var zeroTimezone = time.FixedZone("", 0)
 
-// Parsed piece of DA, TM, or DT info.
+// durationInfo holds parsed piece of DA, TM, or DT info.
 type durationInfo struct {
-	// The parsed int value
+	// Value is the parsed int value.
 	Value int
-	// Whether it was present in the string
-	Present bool
-	// Only used when parsing Fractal seconds: the level of precision used.
+	// PresentInSource is whether it was present in the string.
+	PresentInSource bool
+	// FractalPrecision is only used when parsing Fractal seconds: the level of
+	// precision used.
 	FractalPrecision PrecisionLevel
 }
 
-func extractDurationInfo(subMatches []string, index int, fractal bool) (
-	info durationInfo, err error,
-) {
+// extractDurationInfo extracts a piece of DA, TM, or DT info from a parsed regex,
+// handling all validation checks, emtpy values, etc.
+func extractDurationInfo(subMatches []string, index int, isFractal bool) (durationInfo, error) {
+	info := durationInfo{}
+
+	// If the submatch array does not contain the group index we are looking for, then
+	// we need to return a parsing error.
 	if len(subMatches) <= index {
 		return info, errors.New("not enough sub-matches")
 	}
 
+	// Get the value of our capture group.
 	valueStr := subMatches[index]
-	// If there was no match for the specific subgroup, this value is 0.
-	if valueStr == "" {
-		valueStr = "0"
-	} else {
-		info.Present = true
+
+	// If there was no match for the specific subgroup, this value is 0, and we leave
+	// info.PresentInSource as false.
+	if valueStr != "" {
+		// Otherwise set the info.PresentInSource to true
+		info.PresentInSource = true
 	}
 
-	// If this is a fractal seconds value, we need to pad it out to nanoseconds for go.
-	if fractal {
-		// The fractal value can be any length, with truncation implying a loss of
+	// If this is a isFractal seconds value, we need to pad it out to nanoseconds for
+	// go.
+	if info.PresentInSource && isFractal {
+		// The isFractal value can be any length, with truncation implying a loss of
 		// precision, we need to add trailing zeros to the hundred-millionth place to
 		// get our nano-seconds.
 		missingPlaces := 9 - len(valueStr)
@@ -66,42 +72,32 @@ func extractDurationInfo(subMatches []string, index int, fractal bool) (
 		info.FractalPrecision = PrecisionFull - PrecisionLevel(missingPlaces-3)
 	}
 
-	info.Value, err = strconv.Atoi(valueStr)
-	if err != nil {
-		return info, fmt.Errorf("error parsing int: %w", err)
+	// If our info is present, parse the value into an int.
+	if info.PresentInSource {
+		var err error
+		info.Value, err = strconv.Atoi(valueStr)
+		if err != nil {
+			return info, fmt.Errorf("error parsing int: %w", err)
+		}
 	}
 
 	return info, nil
 }
 
-func updatePrecision(
-	current PrecisionLevel,
-	info durationInfo,
-	infoLevel PrecisionLevel,
-	levelIsFull bool,
-) PrecisionLevel {
-	if info.Present {
-		if levelIsFull {
-			return PrecisionFull
-		}
-		return infoLevel
+// updatePrecision takes in our current precision and a piece of parsed info, then
+// updates the precision based on whether the info was present.
+//
+// levelIsFull should be set to true if the level we are checking is "Full" for the
+// type of value we are parsing. For instance, PrecisionHours would be the full
+// precision of a TM value, and we'll use PrecisionFull instead.
+func updatePrecision(info durationInfo, current, infoLevel PrecisionLevel, levelIsFull bool) PrecisionLevel {
+	// If the info was not present, return our current level.
+	if !info.PresentInSource {
+		return current
 	}
 
-	return current
-}
-
-// Checks if a regex result has matches
-func hasMatches(matches []string, original string) bool {
-	// There must be at least one full match
-	if len(matches) < 1 {
-		return false
+	if levelIsFull {
+		return PrecisionFull
 	}
-
-	// If the full match is not the entire original string, then it is not a match.
-	if matches[0] != original {
-		return false
-	}
-
-	// Otherwise it's good.
-	return true
+	return infoLevel
 }

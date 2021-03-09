@@ -2,6 +2,7 @@ package dcmtime
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -20,29 +21,52 @@ type Time struct {
 // NOTE: Time zones are ignored in this operation, as TM does not support encoding them.
 // Make sure values are converted to UTC before passing if that is the desired output.
 func (tm Time) DCM() string {
-	tmVal := fmt.Sprintf("%02d", tm.Time.Hour())
+	builder := strings.Builder{}
+
+	builder.WriteString(fmt.Sprintf("%02d", tm.Time.Hour()))
 	if !isIncluded(PrecisionMinutes, tm.Precision) {
-		return tmVal
+		return builder.String()
 	}
 
-	tmVal += fmt.Sprintf("%02d", tm.Time.Minute())
+	builder.WriteString(fmt.Sprintf("%02d", tm.Time.Minute()))
 	if !isIncluded(PrecisionSeconds, tm.Precision) {
-		return tmVal
+		return builder.String()
 	}
 
-	tmVal += fmt.Sprintf("%02d", tm.Time.Second())
+	builder.WriteString(fmt.Sprintf("%02d", tm.Time.Second()))
 	if !isIncluded(PrecisionMS1, tm.Precision) {
-		return tmVal
+		return builder.String()
 	}
 
-	tmVal += "." + truncateMilliseconds(tm.Time.Nanosecond(), tm.Precision)
+	builder.WriteRune('.')
+	builder.WriteString(truncateMilliseconds(tm.Time.Nanosecond(), tm.Precision))
 
-	return tmVal
+	return builder.String()
 }
 
 // String implements fmt.Stringer.
 func (tm Time) String() string {
-	return tm.DCM()
+	builder := strings.Builder{}
+
+	builder.WriteString(fmt.Sprintf("%02d", tm.Time.Hour()))
+	if !isIncluded(PrecisionMinutes, tm.Precision) {
+		return builder.String()
+	}
+
+	builder.WriteString(fmt.Sprintf(":%02d", tm.Time.Minute()))
+	if !isIncluded(PrecisionSeconds, tm.Precision) {
+		return builder.String()
+	}
+
+	builder.WriteString(fmt.Sprintf(":%02d", tm.Time.Second()))
+	if !isIncluded(PrecisionMS1, tm.Precision) {
+		return builder.String()
+	}
+
+	builder.WriteRune('.')
+	builder.WriteString(truncateMilliseconds(tm.Time.Nanosecond(), tm.Precision))
+
+	return builder.String()
 }
 
 // Holds group indexes for a given source types regex.
@@ -90,24 +114,24 @@ func extractTime(
 	if err != nil {
 		return hours, minutes, seconds, nanos, precisionOut, err
 	}
-	precisionOut = updatePrecision(precisionIn, hours, PrecisionHours, false)
+	precisionOut = updatePrecision(hours, precisionIn, PrecisionHours, false)
 
 	minutes, err = extractDurationInfo(matches, groupIndexes.Minutes, false)
 	if err != nil {
 		return hours, minutes, seconds, nanos, precisionOut, err
 	}
-	precisionOut = updatePrecision(precisionOut, minutes, PrecisionMinutes, false)
+	precisionOut = updatePrecision(minutes, precisionOut, PrecisionMinutes, false)
 
 	seconds, err = extractDurationInfo(matches, groupIndexes.Seconds, false)
 	if err != nil {
 		return hours, minutes, seconds, nanos, precisionOut, err
 	}
-	precisionOut = updatePrecision(precisionOut, seconds, PrecisionSeconds, false)
+	precisionOut = updatePrecision(seconds, precisionOut, PrecisionSeconds, false)
 
 	nanos, err = extractDurationInfo(matches, groupIndexes.Fractal, true)
 	if err != nil {
 		return hours, minutes, seconds, nanos, precisionOut, err
-	} else if nanos.Present {
+	} else if nanos.PresentInSource {
 		precisionOut = nanos.FractalPrecision
 	}
 
@@ -118,7 +142,7 @@ func extractTime(
 func ParseTime(tmString string) (Time, error) {
 	matches := tmRegex.FindStringSubmatch(tmString)
 	// If no full match is found, return an error
-	if !hasMatches(matches, tmString) {
+	if len(matches) == 0 {
 		return Time{}, ErrParseTM
 	}
 

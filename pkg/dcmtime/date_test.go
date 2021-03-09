@@ -1,216 +1,201 @@
-package dcmtime
+package dcmtime_test
 
 import (
+	"errors"
+	"github.com/suyashkumar/dicom/pkg/dcmtime"
 	"testing"
 	"time"
 )
 
 func TestParseDate(t *testing.T) {
 	testCases := []struct {
+		Name              string
 		DAValue           string
+		ExpectedString    string
 		Expected          time.Time
-		ExpectedPrecision PrecisionLevel
-		AllowNema         bool
+		ExpectedPrecision dcmtime.PrecisionLevel
 	}{
-		// DICOM full date
 		{
-			DAValue: "20200304",
-			Expected: time.Date(
-				2020,
-				3,
-				4,
-				0,
-				0,
-				0,
-				0,
-				time.UTC,
-			),
-			ExpectedPrecision: PrecisionFull,
-			AllowNema:         false,
+			Name:              "PrecisionFull",
+			DAValue:           "20200304",
+			ExpectedString:    "2020-03-04",
+			Expected:          time.Date(2020, 3, 4, 0, 0, 0, 0, time.UTC),
+			ExpectedPrecision: dcmtime.PrecisionFull,
 		},
-		// DICOM no day
 		{
-			DAValue: "202003",
-			Expected: time.Date(
-				2020,
-				3,
-				1,
-				0,
-				0,
-				0,
-				0,
-				time.UTC,
-			),
-			ExpectedPrecision: PrecisionMonth,
-			AllowNema:         false,
+			Name:              "PrecisionMonth",
+			DAValue:           "202003",
+			ExpectedString:    "2020-03",
+			Expected:          time.Date(2020, 3, 1, 0, 0, 0, 0, time.UTC),
+			ExpectedPrecision: dcmtime.PrecisionMonth,
 		},
-		// DICOM no month
 		{
-			DAValue: "2020",
-			Expected: time.Date(
-				2020,
-				1,
-				1,
-				0,
-				0,
-				0,
-				0,
-				time.UTC,
-			),
-			ExpectedPrecision: PrecisionYear,
-			AllowNema:         false,
+			Name:              "PrecisionYear",
+			DAValue:           "2020",
+			ExpectedString:    "2020",
+			Expected:          time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
+			ExpectedPrecision: dcmtime.PrecisionYear,
 		},
-		// NEMA full date
 		{
-			DAValue: "2020.03.04",
-			Expected: time.Date(
-				2020,
-				3,
-				4,
-				0,
-				0,
-				0,
-				0,
-				time.UTC,
-			),
-			ExpectedPrecision: PrecisionFull,
-			AllowNema:         true,
+			Name:              "PrecisionFullNEMA",
+			DAValue:           "2020.03.04",
+			ExpectedString:    "2020-03-04",
+			Expected:          time.Date(2020, 3, 4, 0, 0, 0, 0, time.UTC),
+			ExpectedPrecision: dcmtime.PrecisionFull,
 		},
-		// NEMA no day
 		{
-			DAValue: "2020.03",
-			Expected: time.Date(
-				2020,
-				3,
-				1,
-				0,
-				0,
-				0,
-				0,
-				time.UTC,
-			),
-			ExpectedPrecision: PrecisionMonth,
-			AllowNema:         true,
+			Name:              "PrecisionMonthNEMA",
+			DAValue:           "2020.03",
+			ExpectedString:    "2020-03",
+			Expected:          time.Date(2020, 3, 1, 0, 0, 0, 0, time.UTC),
+			ExpectedPrecision: dcmtime.PrecisionMonth,
 		},
-		// NEMA no month
 		{
-			DAValue: "2020",
-			Expected: time.Date(
-				2020,
-				1,
-				1,
-				0,
-				0,
-				0,
-				0,
-				time.UTC,
-			),
-			ExpectedPrecision: PrecisionYear,
-			AllowNema:         true,
+			Name:              "PrecisionYearNEMA",
+			DAValue:           "2020",
+			ExpectedString:    "2020",
+			Expected:          time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
+			ExpectedPrecision: dcmtime.PrecisionYear,
 		},
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.DAValue, func(t *testing.T) {
-			parsed, err := ParseDate(tc.DAValue, tc.AllowNema)
-			if err != nil {
-				t.Fatal("parse err:", err)
-			}
+		// Run a master test on the test case
+		t.Run(tc.Name, func(t *testing.T) {
 
-			if !tc.Expected.Equal(parsed.Time) {
-				t.Errorf(
-					"parsed time (%v) != expected (%v)",
-					parsed.Time,
-					tc.Expected,
-				)
+			// We'll store the parsed object here for subsequent subtests
+			var parsed dcmtime.Date
 
-			}
+			t.Run("ParseDate", func(t *testing.T) {
+				var err error
+				parsed, err = dcmtime.ParseDate(tc.DAValue)
+				if err != nil {
+					t.Fatal("parse err:", err)
+				}
 
-			if parsed.Precision != tc.ExpectedPrecision {
-				t.Errorf(
-					"precision: expected %v, got %v",
-					tc.ExpectedPrecision.String(),
-					parsed.Precision.String(),
-				)
+				if !tc.Expected.Equal(parsed.Time) {
+					t.Errorf(
+						"parsed time (%v) != expected (%v) from source DA '%v'",
+						parsed.Time,
+						tc.Expected,
+						tc.DAValue,
+					)
+
+				}
+
+				if parsed.Precision != tc.ExpectedPrecision {
+					t.Errorf(
+						"precision: expected %v, got %v from source DA '%v'",
+						tc.ExpectedPrecision.String(),
+						parsed.Precision.String(),
+						tc.DAValue,
+					)
+				}
+			})
+
+			t.Run("String()", func(t *testing.T) {
+				stringVal := parsed.String()
+				if stringVal != tc.ExpectedString {
+					t.Fatalf(
+						"got String() value '%v', expected '%v'",
+						stringVal,
+						tc.ExpectedString,
+					)
+				}
+			})
+
+			t.Run("DCM()", func(t *testing.T) {
+				dcmVal := parsed.DCM()
+				if dcmVal != tc.DAValue {
+					t.Fatalf(
+						"got DCM() value '%v', expected '%v'", dcmVal, tc.DAValue,
+					)
+				}
+			})
+		})
+
+	}
+}
+
+func TestParseDateErr(t *testing.T) {
+	testCases := []struct {
+		Name     string
+		BadValue string
+	}{
+		{
+			Name:     "TooManyDigits",
+			BadValue: "101002034",
+		},
+		{
+			Name:     "MissingDigit_Days",
+			BadValue: "1010023",
+		},
+		{
+			Name:     "MissingDigit_Months",
+			BadValue: "10102",
+		},
+		{
+			Name:     "MissingDigit_Year",
+			BadValue: "101",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			_, err := dcmtime.ParseDate(tc.BadValue)
+			if !errors.Is(err, dcmtime.ErrParseDA) {
+				t.Errorf("expected ErrParseDA, got %v", err)
 			}
 		})
 	}
 }
 
-func TestDate_DCM(t *testing.T) {
+// TestDate_DCMTrimming tests that dates are trimmed to the correct precision on DCM
+// out
+func TestDate_DCMTrimming(t *testing.T) {
 	testCases := []struct {
+		Name      string
 		Time      time.Time
-		Precision PrecisionLevel
+		Precision dcmtime.PrecisionLevel
 		Expected  string
 	}{
 		{
-			Time: time.Date(
-				1010,
-				2,
-				3,
-				0,
-				0,
-				0,
-				0,
-				time.UTC,
-			),
-			Precision: PrecisionFull,
+			Name:      "PrecisionFull",
+			Time:      time.Date(1010, 2, 3, 5, 6, 7, 8, time.UTC),
+			Precision: dcmtime.PrecisionFull,
 			Expected:  "10100203",
 		},
 		{
-			Time: time.Date(
-				1010,
-				2,
-				3,
-				0,
-				0,
-				0,
-				0,
-				time.UTC,
-			),
-			Precision: PrecisionDay,
+			Name:      "PrecisionDay",
+			Time:      time.Date(1010, 2, 3, 5, 6, 7, 8, time.UTC),
+			Precision: dcmtime.PrecisionDay,
 			Expected:  "10100203",
 		},
 		{
-			Time: time.Date(
-				1010,
-				2,
-				3,
-				0,
-				0,
-				0,
-				0,
-				time.UTC,
-			),
-			Precision: PrecisionMonth,
+			Name:      "PrecisionMonth",
+			Time:      time.Date(1010, 2, 3, 5, 6, 7, 8, time.UTC),
+			Precision: dcmtime.PrecisionMonth,
 			Expected:  "101002",
 		},
 		{
-			Time: time.Date(
-				1010,
-				2,
-				3,
-				0,
-				0,
-				0,
-				0,
-				time.UTC,
-			),
-			Precision: PrecisionYear,
+			Name:      "PrecisionYear",
+			Time:      time.Date(1010, 2, 3, 5, 6, 7, 8, time.UTC),
+			Precision: dcmtime.PrecisionYear,
 			Expected:  "1010",
 		},
 	}
 
 	for _, tc := range testCases {
-		name := tc.Expected + "_" + tc.Precision.String()
-		t.Run(name, func(t *testing.T) {
-			da := Date{
+		t.Run(tc.Name, func(t *testing.T) {
+			da := dcmtime.Date{
 				Time:      tc.Time,
 				Precision: tc.Precision,
 			}
 
 			if da.DCM() != tc.Expected {
-				t.Errorf("DCM(): expected '%v', got '%v'", tc.Expected, da.DCM())
+				t.Errorf(
+					"Date.DCM(): expected '%v', got '%v'", tc.Expected, da.DCM(),
+				)
 			}
 		})
 	}
