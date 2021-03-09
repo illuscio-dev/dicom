@@ -87,10 +87,9 @@ type ElementValueDecoder struct {
 	element *Element
 }
 
-// checkSingleValue checks a list of values to see if it is a single value.
-func (converter ElementValueDecoder) checkSingleValue(
-	valueCount int, checkSpec bool,
-) error {
+// checkSingleValue checks a list of values to see if it is a single value AND that
+// the dicom tag we are decoding has a VM of 1.
+func (converter ElementValueDecoder) checkSingleValue(valueCount int) error {
 	elementTag := converter.element.Tag
 
 	// If our value count is not 1, immediately return an error.
@@ -98,10 +97,10 @@ func (converter ElementValueDecoder) checkSingleValue(
 		return newErrMultipleValuesFound(valueCount)
 	}
 
-	// If we are ignoring the spec OR this is a private tag, we are good to go. We have
-	// a single value, so we will convert it. If this is a private tag, we have no way
-	// of checking the spec, so we can ignore that the user wants us to check it.
-	if !checkSpec || tag.IsPrivate(elementTag.Group) {
+	// If this is a private tag, we are good to go. We have a single value, so we will
+	// convert it. IWe have no way of checking the spec, so we can ignore that the user
+	// wants us to check it.
+	if tag.IsPrivate(elementTag.Group) {
 		return nil
 	}
 
@@ -121,7 +120,7 @@ func (converter ElementValueDecoder) checkSingleValue(
 	return nil
 }
 
-// checkVR checks whether the VR we expect is what we found, adn returns an error if so.
+// checkVR checks whether the VR we expect is what we found.
 func (converter ElementValueDecoder) checkVR(expectedVR string) bool {
 	return expectedVR == converter.element.RawValueRepresentation
 }
@@ -161,16 +160,15 @@ func (converter ElementValueDecoder) ToStrings() ([]string, error) {
 // This method will fail if the underlying value is the wrong type, or does not contain
 // a single value.
 //
-// If checkSpec is true, the VR of the element tag will be looked up in the dicom
-// spec, and the operation will fail if it is not '1', regardless of how many values
-// are in this specific instance of the element.
-func (converter ElementValueDecoder) ToString(checkSpec bool) (string, error) {
+// If the ValueMultiplicity (VM) of this tag in the DICOM spec is not '1', an error will
+// be returned regardless of the value count for this specific element.
+func (converter ElementValueDecoder) ToString() (string, error) {
 	strings, err := converter.ToStrings()
 	if err != nil {
 		return "", err
 	}
 
-	err = converter.checkSingleValue(len(strings), checkSpec)
+	err = converter.checkSingleValue(len(strings))
 	if err != nil {
 		return "", err
 	}
@@ -196,16 +194,15 @@ func (converter ElementValueDecoder) ToInts() ([]int, error) {
 // This method will fail if the underlying value is the wrong type, or does not contain
 // a single value.
 //
-// If checkSpec is true, the VR of the element tag will be looked up in the dicom
-// spec, and the operation will fail if it is not '1', regardless of how many values
-// are in this specific instance of the element.
-func (converter ElementValueDecoder) ToInt(checkSpec bool) (int, error) {
+// If the ValueMultiplicity (VM) of this tag in the DICOM spec is not '1', an error will
+// be returned regardless of the value count for this specific element.
+func (converter ElementValueDecoder) ToInt() (int, error) {
 	ints, err := converter.ToInts()
 	if err != nil {
 		return 0, err
 	}
 
-	err = converter.checkSingleValue(len(ints), checkSpec)
+	err = converter.checkSingleValue(len(ints))
 	if err != nil {
 		return 0, err
 	}
@@ -252,18 +249,15 @@ func (converter ElementValueDecoder) ToPersonNames() ([]personname.Info, error) 
 // This method will fail if the underlying value is the wrong type, or does not contain
 // a single value.
 //
-// If checkSpec is true, the VR of the element tag will be looked up in the dicom
-// spec, and the operation will fail if it is not '1', regardless of how many values
-// are in this specific instance of the element.
-func (converter ElementValueDecoder) ToPersonName(
-	checkSpec bool,
-) (personname.Info, error) {
+// If the ValueMultiplicity (VM) of this tag in the DICOM spec is not '1', an error will
+// be returned regardless of the value count for this specific element.
+func (converter ElementValueDecoder) ToPersonName() (personname.Info, error) {
 	names, err := converter.ToPersonNames()
 	if err != nil {
 		return personname.Info{}, err
 	}
 
-	err = converter.checkSingleValue(len(names), checkSpec)
+	err = converter.checkSingleValue(len(names))
 	if err != nil {
 		return personname.Info{}, err
 	}
@@ -273,9 +267,7 @@ func (converter ElementValueDecoder) ToPersonName(
 
 // ToDates tries to coerce the value from dicom.Element.Value.GetValue() to
 // []dcmtime.Date and returns an error on failure.
-//
-// If allowNema is true, parsing of pre-DICOM NEMA-300 style dates will be allowed.
-func (converter ElementValueDecoder) ToDates(allowNema bool) ([]dcmtime.Date, error) {
+func (converter ElementValueDecoder) ToDates() ([]dcmtime.Date, error) {
 	if !converter.checkVR(vrraw.Date) {
 		return nil, newErrBadVR(
 			personname.Info{},
@@ -293,7 +285,7 @@ func (converter ElementValueDecoder) ToDates(allowNema bool) ([]dcmtime.Date, er
 
 	dates := make([]dcmtime.Date, len(dateStrings))
 	for i, thisString := range dateStrings {
-		thisDate, err := dcmtime.ParseDate(thisString, allowNema)
+		thisDate, err := dcmtime.ParseDate(thisString)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing string value %v: %w", i, err)
 		}
@@ -309,20 +301,15 @@ func (converter ElementValueDecoder) ToDates(allowNema bool) ([]dcmtime.Date, er
 // This method will fail if the underlying value is the wrong type, or does not contain
 // a single value.
 //
-// If checkSpec is true, the VR of the element tag will be looked up in the dicom
-// spec, and the operation will fail if it is not '1', regardless of how many values
-// are in this specific instance of the element.
-//
-// If allowNema is true, parsing of pre-DICOM NEMA-300 style dates will be allowed.
-func (converter ElementValueDecoder) ToDate(
-	checkSpec bool, allowNema bool,
-) (dcmtime.Date, error) {
-	dates, err := converter.ToDates(allowNema)
+// If the ValueMultiplicity (VM) of this tag in the DICOM spec is not '1', an error will
+// be returned regardless of the value count for this specific element.
+func (converter ElementValueDecoder) ToDate() (dcmtime.Date, error) {
+	dates, err := converter.ToDates()
 	if err != nil {
 		return dcmtime.Date{}, err
 	}
 
-	err = converter.checkSingleValue(len(dates), checkSpec)
+	err = converter.checkSingleValue(len(dates))
 	if err != nil {
 		return dcmtime.Date{}, err
 	}
@@ -366,16 +353,15 @@ func (converter ElementValueDecoder) ToTimes() ([]dcmtime.Time, error) {
 // This method will fail if the underlying value is the wrong type, or does not contain
 // a single value.
 //
-// If checkSpec is true, the VR of the element tag will be looked up in the dicom
-// spec, and the operation will fail if it is not '1', regardless of how many values
-// are in this specific instance of the element.
-func (converter ElementValueDecoder) ToTime(checkSpec bool) (dcmtime.Time, error) {
+// If the ValueMultiplicity (VM) of this tag in the DICOM spec is not '1', an error will
+// be returned regardless of the value count for this specific element.
+func (converter ElementValueDecoder) ToTime() (dcmtime.Time, error) {
 	times, err := converter.ToTimes()
 	if err != nil {
 		return dcmtime.Time{}, err
 	}
 
-	err = converter.checkSingleValue(len(times), checkSpec)
+	err = converter.checkSingleValue(len(times))
 	if err != nil {
 		return dcmtime.Time{}, err
 	}
@@ -419,16 +405,15 @@ func (converter ElementValueDecoder) ToDatetimes() ([]dcmtime.Datetime, error) {
 // This method will fail if the underlying value is the wrong type, or does not contain
 // a single value.
 //
-// If checkSpec is true, the VR of the element tag will be looked up in the dicom
-// spec, and the operation will fail if it is not '1', regardless of how many values
-// are in this specific instance of the element.
-func (converter ElementValueDecoder) ToDatetime(checkSpec bool) (dcmtime.Datetime, error) {
+// If the ValueMultiplicity (VM) of this tag in the DICOM spec is not '1', an error will
+// be returned regardless of the value count for this specific element.
+func (converter ElementValueDecoder) ToDatetime() (dcmtime.Datetime, error) {
 	datetimes, err := converter.ToDatetimes()
 	if err != nil {
 		return dcmtime.Datetime{}, err
 	}
 
-	err = converter.checkSingleValue(len(datetimes), checkSpec)
+	err = converter.checkSingleValue(len(datetimes))
 	if err != nil {
 		return dcmtime.Datetime{}, err
 	}
@@ -461,8 +446,8 @@ func (must ElementMustValueDecoder) ToStrings() []string {
 }
 
 // ToString is as ElementValueDecoder.ToString(), but panics on error.
-func (must ElementMustValueDecoder) ToString(checkSpec bool) string {
-	stringVal, err := must.converter.ToString(checkSpec)
+func (must ElementMustValueDecoder) ToString() string {
+	stringVal, err := must.converter.ToString()
 	if err != nil {
 		panic(err)
 	}
@@ -479,8 +464,8 @@ func (must ElementMustValueDecoder) ToInts() []int {
 }
 
 // ToInt is as ElementValueDecoder.ToInt(), but panics on error.
-func (must ElementMustValueDecoder) ToInt(checkSpec bool) int {
-	intVal, err := must.converter.ToInt(checkSpec)
+func (must ElementMustValueDecoder) ToInt() int {
+	intVal, err := must.converter.ToInt()
 	if err != nil {
 		panic(err)
 	}
@@ -497,8 +482,8 @@ func (must ElementMustValueDecoder) ToPersonNames() []personname.Info {
 }
 
 // ToPersonName is as ElementValueDecoder.ToPersonName(), but panics on error.
-func (must ElementMustValueDecoder) ToPersonName(checkSpec bool) personname.Info {
-	name, err := must.converter.ToPersonName(checkSpec)
+func (must ElementMustValueDecoder) ToPersonName() personname.Info {
+	name, err := must.converter.ToPersonName()
 	if err != nil {
 		panic(err)
 	}
@@ -506,8 +491,8 @@ func (must ElementMustValueDecoder) ToPersonName(checkSpec bool) personname.Info
 }
 
 // ToDates is as ElementValueDecoder.ToDates(), but panics on error.
-func (must ElementMustValueDecoder) ToDates(allowNema bool) []dcmtime.Date {
-	names, err := must.converter.ToDates(allowNema)
+func (must ElementMustValueDecoder) ToDates() []dcmtime.Date {
+	names, err := must.converter.ToDates()
 	if err != nil {
 		panic(err)
 	}
@@ -515,10 +500,8 @@ func (must ElementMustValueDecoder) ToDates(allowNema bool) []dcmtime.Date {
 }
 
 // ToDate is as ElementValueDecoder.ToDate(), but panics on error.
-func (must ElementMustValueDecoder) ToDate(
-	checkSpec bool, allowNema bool,
-) dcmtime.Date {
-	date, err := must.converter.ToDate(checkSpec, allowNema)
+func (must ElementMustValueDecoder) ToDate() dcmtime.Date {
+	date, err := must.converter.ToDate()
 	if err != nil {
 		panic(err)
 	}
@@ -535,8 +518,8 @@ func (must ElementMustValueDecoder) ToTimes() []dcmtime.Time {
 }
 
 // ToTime is as ElementValueDecoder.ToTime(), but panics on error.
-func (must ElementMustValueDecoder) ToTime(checkSpec bool) dcmtime.Time {
-	timeVal, err := must.converter.ToTime(checkSpec)
+func (must ElementMustValueDecoder) ToTime() dcmtime.Time {
+	timeVal, err := must.converter.ToTime()
 	if err != nil {
 		panic(err)
 	}
@@ -553,8 +536,8 @@ func (must ElementMustValueDecoder) ToDatetimes() []dcmtime.Datetime {
 }
 
 // ToDatetime is as ElementValueDecoder.ToDatetime(), but panics on error.
-func (must ElementMustValueDecoder) ToDatetime(checkSpec bool) dcmtime.Datetime {
-	datetimeVal, err := must.converter.ToDatetime(checkSpec)
+func (must ElementMustValueDecoder) ToDatetime() dcmtime.Datetime {
+	datetimeVal, err := must.converter.ToDatetime()
 	if err != nil {
 		panic(err)
 	}
